@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AppState, Page, ThemeOption } from './types';
 import { extractGenericTable } from './services/geminiService';
 import { fileToBase64, convertPdfToImages, downloadExcelMultiSheet, downloadExcelMasterSheet } from './utils/fileUtils';
@@ -6,8 +6,8 @@ import ImageProcessor from './components/ImageProcessor';
 import ResultsTable from './components/ResultsTable';
 import { 
   Upload, Loader2, Sparkles, FileSpreadsheet, 
-  Layout, Settings, ChevronRight, FileText, 
-  Trash2, Play, CheckCircle, AlertCircle 
+  Layout, ChevronRight, FileText, 
+  Trash2, Play, CheckCircle, AlertCircle, FolderInput
 } from 'lucide-react';
 
 // --- Theme Configurations ---
@@ -42,6 +42,8 @@ const App: React.FC = () => {
     theme: 'light'
   });
 
+  const [isDragging, setIsDragging] = useState(false);
+
   // Inject Theme CSS
   useEffect(() => {
     const style = document.createElement('style');
@@ -57,6 +59,7 @@ const App: React.FC = () => {
       .app-border { border-color: var(--border); }
       .app-accent { background-color: var(--accent); color: white; }
       .app-accent:hover { background-color: var(--accent-hover); }
+      .app-accent-text { color: var(--accent); }
     `;
     const oldStyle = document.getElementById('theme-style');
     if (oldStyle) oldStyle.remove();
@@ -69,40 +72,43 @@ const App: React.FC = () => {
 
   }, [state.theme]);
 
-  // Handlers
-  const handleFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files?.length) return;
+  // Unified File Processing Logic
+  const processUploadedFiles = useCallback(async (files: File[]) => {
+    if (!files.length) return;
     
     setState(prev => ({ ...prev, globalStatus: 'uploading' }));
     
     const newPages: Page[] = [];
-    const files = Array.from(e.target.files);
 
     for (const file of files) {
-      if (file.type === 'application/pdf') {
-        const images = await convertPdfToImages(file);
-        images.forEach((img, idx) => {
+      try {
+        if (file.type === 'application/pdf') {
+          const images = await convertPdfToImages(file);
+          images.forEach((img, idx) => {
+            newPages.push({
+              id: Math.random().toString(36).substr(2, 9),
+              name: `${file.name} - Page ${idx + 1}`,
+              originalImage: img,
+              processedImage: img,
+              extractedData: null,
+              status: 'idle',
+              errorMessage: null
+            });
+          });
+        } else if (file.type.startsWith('image/')) {
+          const base64 = await fileToBase64(file);
           newPages.push({
             id: Math.random().toString(36).substr(2, 9),
-            name: `${file.name} - Page ${idx + 1}`,
-            originalImage: img,
-            processedImage: img, // Default to original until processed
+            name: file.name,
+            originalImage: base64,
+            processedImage: base64,
             extractedData: null,
             status: 'idle',
             errorMessage: null
           });
-        });
-      } else {
-        const base64 = await fileToBase64(file);
-        newPages.push({
-          id: Math.random().toString(36).substr(2, 9),
-          name: file.name,
-          originalImage: base64,
-          processedImage: base64,
-          extractedData: null,
-          status: 'idle',
-          errorMessage: null
-        });
+        }
+      } catch (error) {
+        console.error(`Error processing file ${file.name}:`, error);
       }
     }
 
@@ -112,6 +118,31 @@ const App: React.FC = () => {
       selectedPageId: prev.selectedPageId || newPages[0]?.id || null,
       globalStatus: 'idle'
     }));
+  }, []);
+
+  // Event Handlers
+  const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.length) {
+      await processUploadedFiles(Array.from(e.target.files));
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files?.length) {
+      await processUploadedFiles(Array.from(e.dataTransfer.files));
+    }
   };
 
   const processPage = async (pageId: string) => {
@@ -166,14 +197,16 @@ const App: React.FC = () => {
         </div>
 
         <div className="p-4 space-y-6 flex-1 overflow-y-auto">
-          {/* File Upload */}
-          <div>
-            <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed app-border rounded-lg cursor-pointer hover:bg-black/5 transition-colors">
-              <Upload className="w-6 h-6 app-text-muted mb-1" />
-              <span className="text-xs app-text-muted">Upload PDF or Images</span>
-              <input type="file" className="hidden" multiple accept="image/*,.pdf" onChange={handleFiles} />
-            </label>
-          </div>
+          {/* File Upload (Small - only visible when pages exist to save space) */}
+          {state.pages.length > 0 && (
+            <div>
+              <label className="flex flex-col items-center justify-center w-full h-20 border-2 border-dashed app-border rounded-lg cursor-pointer hover:bg-black/5 transition-colors">
+                <Upload className="w-5 h-5 app-text-muted mb-1" />
+                <span className="text-[10px] app-text-muted">Add more files</span>
+                <input type="file" className="hidden" multiple accept="image/*,.pdf" onChange={handleFileInput} />
+              </label>
+            </div>
+          )}
 
           {/* Theme Selector */}
           <div>
@@ -228,14 +261,43 @@ const App: React.FC = () => {
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 bg-transparent">
         {state.pages.length === 0 ? (
-           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-             <div className="w-24 h-24 rounded-full bg-[var(--bg-card)] flex items-center justify-center mb-6 shadow-sm border app-border">
-                <FileText className="w-12 h-12 app-text-muted" />
-             </div>
-             <h2 className="text-2xl font-bold app-text mb-2">Smart Document Digitizer</h2>
-             <p className="app-text-muted max-w-md">
-               Upload scanned documents or PDFs. We'll automatically digitize tables, handwriting, and text into Excel.
-             </p>
+          // --- EMPTY STATE / DRAG & DROP ZONE ---
+           <div 
+             className={`flex-1 flex flex-col items-center justify-center p-8 transition-colors duration-200 ${
+               isDragging ? 'bg-[var(--accent)] bg-opacity-5' : ''
+             }`}
+             onDragOver={handleDragOver}
+             onDragLeave={handleDragLeave}
+             onDrop={handleDrop}
+           >
+             <label 
+               className={`flex flex-col items-center justify-center w-full max-w-2xl h-80 border-4 border-dashed rounded-3xl cursor-pointer transition-all duration-300 ${
+                 isDragging 
+                 ? 'border-[var(--accent)] scale-105 bg-[var(--bg-card)]' 
+                 : 'border-[var(--border)] bg-[var(--bg-card)] hover:bg-black/5 hover:border-[var(--accent)]'
+               }`}
+             >
+                <div className={`w-24 h-24 rounded-full flex items-center justify-center mb-6 shadow-sm transition-colors ${isDragging ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-main)] app-text-muted'}`}>
+                  {isDragging ? <FolderInput className="w-10 h-10" /> : <Upload className="w-10 h-10" />}
+                </div>
+                <h2 className="text-2xl font-bold app-text mb-2">
+                  {isDragging ? 'Drop Files Here' : 'Upload PDF or Images'}
+                </h2>
+                <p className="app-text-muted max-w-md text-center mb-6 px-4">
+                  Drag and drop files or a folder containing images. <br/>
+                  We accept JPG, PNG, and PDF files.
+                </p>
+                <div className="px-6 py-2 rounded-full app-accent font-medium shadow-md">
+                   Select Files
+                </div>
+                <input 
+                  type="file" 
+                  className="hidden" 
+                  multiple 
+                  accept="image/*,.pdf" 
+                  onChange={handleFileInput} 
+                />
+             </label>
            </div>
         ) : (
           <div className="flex h-full">
