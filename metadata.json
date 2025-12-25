@@ -1,5 +1,5 @@
 {
-  "name": "VisionToData",
+  "name": "Smart Document Digitizer",
   "description": "A powerful React application that transforms images of handwritten notes and tables into structured Excel-ready data using Gemini 3.0 Vision capabilities and client-side image processing.",
   "requestFramePermissions": []
 }

@@ -4,19 +4,29 @@ export interface ExtractedDataRow {
 
 export type ProcessingStatus = 'idle' | 'uploading' | 'processing' | 'extracting' | 'complete' | 'error';
 
-export interface AppState {
-  originalImage: string | null;
+export interface Page {
+  id: string;
+  name: string;
+  originalImage: string; // Base64
   processedImage: string | null;
-  extractedData: ExtractedDataRow[];
+  extractedData: ExtractedDataRow[] | null;
   status: ProcessingStatus;
   errorMessage: string | null;
-  isDarkMode: boolean;
+}
+
+export type ThemeOption = 'light' | 'dark' | 'grey' | 'warm';
+
+export interface AppState {
+  pages: Page[];
+  selectedPageId: string | null;
+  globalStatus: ProcessingStatus;
+  theme: ThemeOption;
 }
 
 export interface ImageProcessingSettings {
   brightness: number;
   contrast: number;
-  threshold: number; // 0-255, 0 means disabled
+  threshold: number;
   grayscale: boolean;
   rotation: number;
 }

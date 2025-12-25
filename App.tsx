@@ -1,182 +1,341 @@
-import React, { useState, useEffect } from 'react';
-import { AppState, ProcessingStatus } from './types';
+import React, { useState, useEffect, useRef } from 'react';
+import { AppState, Page, ThemeOption } from './types';
 import { extractGenericTable } from './services/geminiService';
-import { fileToBase64 } from './utils/fileUtils';
+import { fileToBase64, convertPdfToImages, downloadExcelMultiSheet, downloadExcelMasterSheet } from './utils/fileUtils';
 import ImageProcessor from './components/ImageProcessor';
 import ResultsTable from './components/ResultsTable';
-import { Upload, Moon, Sun, Loader2, Sparkles, FileSpreadsheet, ScanLine } from 'lucide-react';
+import { 
+  Upload, Loader2, Sparkles, FileSpreadsheet, 
+  Layout, Settings, ChevronRight, FileText, 
+  Trash2, Play, CheckCircle, AlertCircle 
+} from 'lucide-react';
+
+// --- Theme Configurations ---
+const themes: Record<ThemeOption, string> = {
+  light: `
+    --bg-main: #f8fafc; --bg-card: #ffffff; --bg-sidebar: #f1f5f9;
+    --text-main: #0f172a; --text-muted: #64748b;
+    --border: #e2e8f0; --accent: #4f46e5; --accent-hover: #4338ca;
+  `,
+  dark: `
+    --bg-main: #0f172a; --bg-card: #1e293b; --bg-sidebar: #020617;
+    --text-main: #f8fafc; --text-muted: #94a3b8;
+    --border: #334155; --accent: #6366f1; --accent-hover: #818cf8;
+  `,
+  grey: `
+    --bg-main: #e5e5e5; --bg-card: #d4d4d4; --bg-sidebar: #a3a3a3;
+    --text-main: #171717; --text-muted: #404040;
+    --border: #737373; --accent: #262626; --accent-hover: #171717;
+  `,
+  warm: `
+    --bg-main: #fef3c7; --bg-card: #fffbeb; --bg-sidebar: #fde68a;
+    --text-main: #78350f; --text-muted: #92400e;
+    --border: #fcd34d; --accent: #d97706; --accent-hover: #b45309;
+  `
+};
 
 const App: React.FC = () => {
-  // Theme Management
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-        return window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
-    return false;
-  });
-
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDarkMode]);
-
-  // App State
   const [state, setState] = useState<AppState>({
-    originalImage: null,
-    processedImage: null,
-    extractedData: [],
-    status: 'idle',
-    errorMessage: null,
-    isDarkMode: false
+    pages: [],
+    selectedPageId: null,
+    globalStatus: 'idle',
+    theme: 'light'
   });
+
+  // Inject Theme CSS
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.innerHTML = `
+      :root {
+        ${themes[state.theme]}
+      }
+      body { background-color: var(--bg-main); color: var(--text-main); }
+      .app-card { background-color: var(--bg-card); border-color: var(--border); }
+      .app-sidebar { background-color: var(--bg-sidebar); border-right-color: var(--border); }
+      .app-text { color: var(--text-main); }
+      .app-text-muted { color: var(--text-muted); }
+      .app-border { border-color: var(--border); }
+      .app-accent { background-color: var(--accent); color: white; }
+      .app-accent:hover { background-color: var(--accent-hover); }
+    `;
+    const oldStyle = document.getElementById('theme-style');
+    if (oldStyle) oldStyle.remove();
+    style.id = 'theme-style';
+    document.head.appendChild(style);
+
+    // Tailwind Dark Mode Sync
+    if (state.theme === 'dark') document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
+
+  }, [state.theme]);
 
   // Handlers
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const handleFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return;
+    
+    setState(prev => ({ ...prev, globalStatus: 'uploading' }));
+    
+    const newPages: Page[] = [];
+    const files = Array.from(e.target.files);
 
-    try {
-      setState(prev => ({ ...prev, status: 'uploading', errorMessage: null }));
-      const base64 = await fileToBase64(file);
-      setState(prev => ({ ...prev, originalImage: base64, status: 'processing' }));
-    } catch (error) {
-      setState(prev => ({ ...prev, status: 'error', errorMessage: 'Failed to load image.' }));
+    for (const file of files) {
+      if (file.type === 'application/pdf') {
+        const images = await convertPdfToImages(file);
+        images.forEach((img, idx) => {
+          newPages.push({
+            id: Math.random().toString(36).substr(2, 9),
+            name: `${file.name} - Page ${idx + 1}`,
+            originalImage: img,
+            processedImage: img, // Default to original until processed
+            extractedData: null,
+            status: 'idle',
+            errorMessage: null
+          });
+        });
+      } else {
+        const base64 = await fileToBase64(file);
+        newPages.push({
+          id: Math.random().toString(36).substr(2, 9),
+          name: file.name,
+          originalImage: base64,
+          processedImage: base64,
+          extractedData: null,
+          status: 'idle',
+          errorMessage: null
+        });
+      }
     }
-  };
 
-  const handleProcessComplete = async (processedImage: string) => {
-    setState(prev => ({ ...prev, processedImage, status: 'extracting' }));
-    try {
-      const data = await extractGenericTable(processedImage);
-      setState(prev => ({ ...prev, extractedData: data, status: 'complete' }));
-    } catch (error) {
-        console.error(error);
-      setState(prev => ({ 
-          ...prev, 
-          status: 'error', 
-          errorMessage: error instanceof Error ? error.message : "Failed to extract data."
-        }));
-    }
-  };
-
-  const handleReset = () => {
     setState(prev => ({
       ...prev,
-      originalImage: null,
-      processedImage: null,
-      extractedData: [],
-      status: 'idle',
-      errorMessage: null
+      pages: [...prev.pages, ...newPages],
+      selectedPageId: prev.selectedPageId || newPages[0]?.id || null,
+      globalStatus: 'idle'
     }));
   };
 
-  // Render Helpers
-  const renderContent = () => {
-    switch (state.status) {
-      case 'idle':
-      case 'uploading':
-        return (
-          <div className="flex flex-col items-center justify-center min-h-[50vh] border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl bg-slate-50/50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors p-10">
-            <div className="w-20 h-20 bg-primary-100 dark:bg-primary-900/30 rounded-full flex items-center justify-center mb-6 text-primary-600 dark:text-primary-400">
-                <Upload className="w-10 h-10" />
-            </div>
-            <h2 className="text-2xl font-bold mb-2">Upload Document</h2>
-            <p className="text-slate-500 dark:text-slate-400 mb-8 text-center max-w-md">
-              Drag and drop or click to upload an image of a table, invoice, or handwritten note.
-            </p>
-            <label className="relative cursor-pointer bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 px-8 rounded-full shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5">
-              <span>Choose File</span>
-              <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
-            </label>
-            <div className="mt-8 flex gap-8 text-sm text-slate-400">
-                <span className="flex items-center gap-2"><ScanLine className="w-4 h-4" /> AI OCR</span>
-                <span className="flex items-center gap-2"><Sparkles className="w-4 h-4" /> Auto-Format</span>
-                <span className="flex items-center gap-2"><FileSpreadsheet className="w-4 h-4" /> Excel Ready</span>
-            </div>
-          </div>
-        );
+  const processPage = async (pageId: string) => {
+    const page = state.pages.find(p => p.id === pageId);
+    if (!page || !page.processedImage) return;
 
-      case 'processing':
-        return state.originalImage ? (
-          <ImageProcessor 
-            imageData={state.originalImage} 
-            onProcessComplete={handleProcessComplete}
-            onCancel={handleReset}
-          />
-        ) : null;
+    setState(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => p.id === pageId ? { ...p, status: 'extracting' } : p)
+    }));
 
-      case 'extracting':
-        return (
-          <div className="flex flex-col items-center justify-center min-h-[50vh]">
-            <Loader2 className="w-16 h-16 text-primary-500 animate-spin mb-6" />
-            <h3 className="text-xl font-semibold mb-2">Analyzing Document...</h3>
-            <p className="text-slate-500 dark:text-slate-400">Gemini 3.0 is extracting your data.</p>
-          </div>
-        );
-
-      case 'complete':
-        return (
-          <ResultsTable data={state.extractedData} onReset={handleReset} />
-        );
-
-      case 'error':
-        return (
-          <div className="flex flex-col items-center justify-center min-h-[50vh] text-center p-8">
-            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-4 text-red-500">
-                <span className="text-3xl font-bold">!</span>
-            </div>
-            <h3 className="text-xl font-bold text-red-600 dark:text-red-400 mb-2">Something went wrong</h3>
-            <p className="text-slate-600 dark:text-slate-300 mb-6 max-w-md">{state.errorMessage}</p>
-            <button 
-                onClick={handleReset}
-                className="px-6 py-2 bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 rounded-lg font-medium"
-            >
-                Try Again
-            </button>
-          </div>
-        );
+    try {
+      const data = await extractGenericTable(page.processedImage);
+      setState(prev => ({
+        ...prev,
+        pages: prev.pages.map(p => p.id === pageId ? { ...p, extractedData: data, status: 'complete' } : p)
+      }));
+    } catch (err: any) {
+      setState(prev => ({
+        ...prev,
+        pages: prev.pages.map(p => p.id === pageId ? { ...p, status: 'error', errorMessage: err.message } : p)
+      }));
     }
   };
 
+  const processAll = async () => {
+    const idlePages = state.pages.filter(p => p.status === 'idle' || p.status === 'error');
+    for (const page of idlePages) {
+      await processPage(page.id);
+    }
+  };
+
+  const handlePageUpdate = (pageId: string, newImage: string) => {
+    setState(prev => ({
+      ...prev,
+      pages: prev.pages.map(p => p.id === pageId ? { ...p, processedImage: newImage } : p)
+    }));
+    // Auto trigger extraction after processing
+    processPage(pageId);
+  };
+
+  // UI Components
+  const selectedPage = state.pages.find(p => p.id === state.selectedPageId);
+
   return (
-    <div className="min-h-screen flex flex-col transition-colors duration-300">
-      {/* Header */}
-      <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-purple-600 rounded-lg flex items-center justify-center text-white">
-                    <Sparkles className="w-5 h-5" />
-                </div>
-                <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-purple-600 dark:from-primary-400 dark:to-purple-400">
-                    VisionToData
-                </h1>
-            </div>
-            
-            <div className="flex items-center gap-4">
-                <button 
-                    onClick={() => setIsDarkMode(!isDarkMode)}
-                    className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
-                >
-                    {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-                </button>
-            </div>
+    <div className="flex h-screen overflow-hidden">
+      {/* Sidebar */}
+      <aside className="w-64 app-sidebar border-r flex flex-col z-20 shadow-xl transition-all duration-300">
+        <div className="p-4 border-b app-border flex items-center gap-2">
+          <Sparkles className="w-6 h-6 text-[var(--accent)]" />
+          <h1 className="font-bold text-lg app-text">DocDigitizer</h1>
         </div>
-      </header>
+
+        <div className="p-4 space-y-6 flex-1 overflow-y-auto">
+          {/* File Upload */}
+          <div>
+            <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed app-border rounded-lg cursor-pointer hover:bg-black/5 transition-colors">
+              <Upload className="w-6 h-6 app-text-muted mb-1" />
+              <span className="text-xs app-text-muted">Upload PDF or Images</span>
+              <input type="file" className="hidden" multiple accept="image/*,.pdf" onChange={handleFiles} />
+            </label>
+          </div>
+
+          {/* Theme Selector */}
+          <div>
+            <h3 className="text-xs font-semibold app-text-muted uppercase mb-3">Theme</h3>
+            <div className="grid grid-cols-2 gap-2">
+              {(['light', 'dark', 'grey', 'warm'] as ThemeOption[]).map(t => (
+                <button
+                  key={t}
+                  onClick={() => setState(s => ({ ...s, theme: t }))}
+                  className={`px-3 py-2 text-xs rounded border ${
+                    state.theme === t 
+                    ? 'border-[var(--accent)] bg-[var(--accent)] text-white' 
+                    : 'app-border app-text hover:bg-black/5'
+                  } capitalize transition-colors`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Actions */}
+          {state.pages.length > 0 && (
+            <div>
+              <h3 className="text-xs font-semibold app-text-muted uppercase mb-3">Actions</h3>
+              <button 
+                onClick={processAll}
+                className="w-full flex items-center justify-center gap-2 py-2 mb-2 app-accent rounded-md text-sm font-medium shadow-sm"
+              >
+                <Play className="w-4 h-4" /> Process All Pending
+              </button>
+              
+              <div className="space-y-2 mt-4">
+                 <button 
+                  onClick={() => downloadExcelMultiSheet(state.pages)}
+                  className="w-full flex items-center gap-2 px-3 py-2 border app-border rounded-md text-sm app-text hover:bg-black/5"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-green-600" /> Excel (Multi-sheet)
+                </button>
+                <button 
+                  onClick={() => downloadExcelMasterSheet(state.pages)}
+                  className="w-full flex items-center gap-2 px-3 py-2 border app-border rounded-md text-sm app-text hover:bg-black/5"
+                >
+                  <Layout className="w-4 h-4 text-blue-600" /> Excel (Master Sheet)
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </aside>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-7xl mx-auto w-full p-4 lg:p-8">
-        {renderContent()}
-      </main>
+      <main className="flex-1 flex flex-col min-w-0 bg-transparent">
+        {state.pages.length === 0 ? (
+           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+             <div className="w-24 h-24 rounded-full bg-[var(--bg-card)] flex items-center justify-center mb-6 shadow-sm border app-border">
+                <FileText className="w-12 h-12 app-text-muted" />
+             </div>
+             <h2 className="text-2xl font-bold app-text mb-2">Smart Document Digitizer</h2>
+             <p className="app-text-muted max-w-md">
+               Upload scanned documents or PDFs. We'll automatically digitize tables, handwriting, and text into Excel.
+             </p>
+           </div>
+        ) : (
+          <div className="flex h-full">
+            {/* Page List */}
+            <div className="w-64 border-r app-border app-card overflow-y-auto">
+              {state.pages.map((page, idx) => (
+                <div 
+                  key={page.id}
+                  onClick={() => setState(s => ({ ...s, selectedPageId: page.id }))}
+                  className={`p-3 border-b app-border cursor-pointer hover:bg-black/5 transition-colors ${
+                    state.selectedPageId === page.id ? 'bg-black/5 border-l-4 border-l-[var(--accent)]' : ''
+                  }`}
+                >
+                  <div className="flex justify-between items-start mb-1">
+                    <span className="text-xs font-bold app-text truncate w-32">{page.name}</span>
+                    <StatusIcon status={page.status} />
+                  </div>
+                  <div className="h-20 bg-slate-200 dark:bg-slate-800 rounded overflow-hidden relative">
+                     <img src={page.processedImage || page.originalImage} className="w-full h-full object-cover opacity-80" />
+                  </div>
+                </div>
+              ))}
+            </div>
 
-      {/* Footer */}
-      <footer className="py-6 text-center text-slate-400 text-sm">
-        <p>Powered by Gemini 3.0 Vision & React</p>
-      </footer>
+            {/* Workspace */}
+            <div className="flex-1 overflow-hidden flex flex-col bg-[var(--bg-main)]">
+              {selectedPage ? (
+                <div className="flex-1 flex flex-col h-full">
+                  <header className="h-14 border-b app-border flex items-center justify-between px-4 app-card">
+                     <h2 className="font-semibold app-text truncate">{selectedPage.name}</h2>
+                     <button 
+                       onClick={() => setState(s => ({ ...s, pages: s.pages.filter(p => p.id !== selectedPage.id), selectedPageId: null }))}
+                       className="p-2 text-red-500 hover:bg-red-50 rounded"
+                     >
+                       <Trash2 className="w-4 h-4" />
+                     </button>
+                  </header>
+                  
+                  <div className="flex-1 overflow-auto p-4">
+                    {selectedPage.status === 'extracting' ? (
+                       <div className="h-full flex flex-col items-center justify-center">
+                          <Loader2 className="w-10 h-10 animate-spin text-[var(--accent)] mb-4" />
+                          <p className="app-text">Extracting data with Gemini 1.5...</p>
+                       </div>
+                    ) : selectedPage.extractedData ? (
+                       <div className="h-full flex flex-col">
+                          <div className="mb-4 flex justify-end">
+                            <button 
+                               onClick={() => setState(s => ({ 
+                                 ...s, 
+                                 pages: s.pages.map(p => p.id === selectedPage.id ? { ...p, extractedData: null } : p) 
+                               }))}
+                               className="text-xs app-text-muted hover:text-[var(--accent)] underline"
+                            >
+                              Re-process Image
+                            </button>
+                          </div>
+                          <div className="flex-1 app-card rounded-lg border app-border overflow-hidden shadow-sm">
+                            <ResultsTable 
+                               data={selectedPage.extractedData} 
+                               onReset={() => {}} // Handled by button above
+                            />
+                          </div>
+                       </div>
+                    ) : (
+                       <div className="h-full flex flex-col items-center">
+                          <div className="w-full max-w-4xl h-[60vh] mb-4">
+                             <ImageProcessor 
+                               imageData={selectedPage.originalImage} 
+                               onProcessComplete={(img) => handlePageUpdate(selectedPage.id, img)}
+                               onCancel={() => {}}
+                             />
+                          </div>
+                          <p className="text-xs app-text-muted mt-2">
+                             Tip: Use the controls above to crop/rotate before extracting.
+                          </p>
+                       </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex items-center justify-center app-text-muted">
+                   Select a page to view
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </main>
     </div>
   );
+};
+
+const StatusIcon = ({ status }: { status: string }) => {
+  switch (status) {
+    case 'complete': return <CheckCircle className="w-4 h-4 text-green-500" />;
+    case 'error': return <AlertCircle className="w-4 h-4 text-red-500" />;
+    case 'extracting': return <Loader2 className="w-4 h-4 animate-spin text-blue-500" />;
+    default: return <div className="w-4 h-4 rounded-full border-2 border-slate-300" />;
+  }
 };
 
 export default App;
