@@ -14,8 +14,8 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ data, onReset }) => {
   if (tableData.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-slate-500">No data extracted.</p>
-        <button onClick={onReset} className="mt-4 text-primary-600 hover:underline">Try Again</button>
+        <p className="app-text-muted">No data extracted.</p>
+        <button onClick={onReset} className="mt-4 app-accent-text hover:underline">Try Again</button>
       </div>
     );
   }
@@ -29,11 +29,11 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ data, onReset }) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700">
-      <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex flex-wrap justify-between items-center gap-4 bg-slate-50 dark:bg-slate-900">
+    <div className="flex flex-col h-full app-card rounded-xl shadow-lg border app-border">
+      <div className="p-4 border-b app-border flex flex-wrap justify-between items-center gap-4 bg-[var(--bg-sidebar)]">
         <div className="flex items-center gap-2">
-            <TableIcon className="w-5 h-5 text-primary-500" />
-            <h3 className="text-lg font-semibold">Extracted Data</h3>
+            <TableIcon className="w-5 h-5 text-[var(--accent)]" />
+            <h3 className="text-lg font-semibold app-text">Extracted Data</h3>
             <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 rounded-full font-medium">
                 {tableData.length} Rows
             </span>
@@ -41,7 +41,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ data, onReset }) => {
         <div className="flex gap-2">
             <button 
                 onClick={onReset}
-                className="flex items-center gap-2 px-3 py-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors text-sm font-medium"
+                className="flex items-center gap-2 px-3 py-1.5 app-text-muted hover:app-text hover:bg-black/5 dark:hover:bg-white/10 rounded-md transition-colors text-sm font-medium"
             >
                 <ArrowLeft className="w-4 h-4" /> Start Over
             </button>
@@ -56,27 +56,27 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ data, onReset }) => {
 
       <div className="flex-1 overflow-auto p-0.5">
         <table className="w-full min-w-[600px] border-collapse text-sm text-left">
-            <thead className="bg-slate-100 dark:bg-slate-950 text-slate-600 dark:text-slate-400 sticky top-0 z-10 shadow-sm">
+            <thead className="bg-[var(--bg-sidebar)] app-text-muted sticky top-0 z-10 shadow-sm">
                 <tr>
-                    <th className="p-3 font-semibold border-b border-r border-slate-200 dark:border-slate-700 w-12 text-center">#</th>
+                    <th className="p-3 font-semibold border-b border-r app-border w-12 text-center">#</th>
                     {headers.map(header => (
-                        <th key={header} className="p-3 font-semibold border-b border-r border-slate-200 dark:border-slate-700 min-w-[150px]">
+                        <th key={header} className="p-3 font-semibold border-b border-r app-border min-w-[150px]">
                             {header}
                         </th>
                     ))}
                 </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+            <tbody className="divide-y app-border">
                 {tableData.map((row, rIndex) => (
-                    <tr key={rIndex} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group">
-                        <td className="p-2 text-center text-slate-400 border-r border-slate-200 dark:border-slate-700 select-none">
+                    <tr key={rIndex} className="hover:bg-black/5 dark:hover:bg-white/5 transition-colors group">
+                        <td className="p-2 text-center app-text-muted border-r app-border select-none">
                             {rIndex + 1}
                         </td>
                         {headers.map((header, cIndex) => (
-                            <td key={`${rIndex}-${cIndex}`} className="p-0 border-r border-slate-200 dark:border-slate-700 relative">
+                            <td key={`${rIndex}-${cIndex}`} className="p-0 border-r app-border relative">
                                 <input
                                     type="text"
-                                    className="w-full h-full p-3 bg-transparent border-none outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500 transition-all text-slate-800 dark:text-slate-200"
+                                    className="w-full h-full p-3 bg-transparent border-none outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--accent)] transition-all app-text"
                                     value={String(row[header] ?? '')}
                                     onChange={(e) => handleCellChange(rIndex, header, e.target.value)}
                                 />
@@ -87,7 +87,7 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ data, onReset }) => {
             </tbody>
         </table>
       </div>
-      <div className="p-2 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 text-xs text-center text-slate-400">
+      <div className="p-2 bg-[var(--bg-sidebar)] border-t app-border text-xs text-center app-text-muted">
         Tip: You can edit the cells before exporting.
       </div>
     </div>

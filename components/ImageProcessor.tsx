@@ -108,20 +108,20 @@ const ImageProcessor: React.FC<ImageProcessorProps> = ({ imageData, onProcessCom
   };
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-slate-800 rounded-xl shadow-lg overflow-hidden border border-slate-200 dark:border-slate-700">
-      <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900">
-        <h3 className="text-lg font-semibold flex items-center gap-2">
-          <Sliders className="w-5 h-5 text-primary-500" />
+    <div className="flex flex-col h-full app-card rounded-xl shadow-lg overflow-hidden border app-border">
+      <div className="p-4 border-b app-border flex justify-between items-center bg-[var(--bg-sidebar)]">
+        <h3 className="text-lg font-semibold flex items-center gap-2 app-text">
+          <Sliders className="w-5 h-5 text-[var(--accent)]" />
           Pre-process Image
         </h3>
         <div className="flex gap-2">
-            <button onClick={onCancel} className="px-3 py-1 text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200">
+            <button onClick={onCancel} className="px-3 py-1 text-sm font-medium app-text-muted hover:app-text transition-colors">
                 Cancel
             </button>
             <button 
                 onClick={handleSave} 
                 disabled={isProcessing}
-                className="flex items-center gap-2 px-4 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-md transition-colors shadow-sm disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-1.5 app-accent text-white text-sm font-medium rounded-md transition-colors shadow-sm disabled:opacity-50"
             >
                 {isProcessing ? 'Processing...' : <><Check className="w-4 h-4" /> Next: Extract Data</>}
             </button>
@@ -130,31 +130,31 @@ const ImageProcessor: React.FC<ImageProcessorProps> = ({ imageData, onProcessCom
 
       <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
         {/* Canvas Area */}
-        <div className="flex-1 bg-slate-100 dark:bg-slate-950 p-4 overflow-auto flex items-center justify-center relative">
-            <canvas ref={canvasRef} className="max-w-full max-h-[60vh] shadow-xl border-2 border-white dark:border-slate-700" />
+        <div className="flex-1 bg-black/5 dark:bg-black/20 p-4 overflow-auto flex items-center justify-center relative">
+            <canvas ref={canvasRef} className="max-w-full max-h-[60vh] shadow-xl border-2 border-[var(--border)]" />
         </div>
 
         {/* Controls Sidebar */}
-        <div className="w-full lg:w-80 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 p-6 overflow-y-auto space-y-6">
+        <div className="w-full lg:w-80 app-card border-l app-border p-6 overflow-y-auto space-y-6">
             
             <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                    <label className="text-sm font-medium">Rotation</label>
+                    <label className="text-sm font-medium app-text">Rotation</label>
                     <button 
                         onClick={() => setSettings(s => ({ ...s, rotation: (s.rotation + 90) % 360 }))}
-                        className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md"
+                        className="p-1 hover:bg-black/5 dark:hover:bg-white/10 rounded-md transition-colors"
                         title="Rotate 90 degrees"
                     >
-                        <RotateCw className="w-4 h-4 text-slate-500" />
+                        <RotateCw className="w-4 h-4 app-text-muted" />
                     </button>
                 </div>
             </div>
 
-            <hr className="border-slate-200 dark:border-slate-700" />
+            <hr className="app-border" />
 
             {/* Brightness */}
             <div className="space-y-2">
-                <div className="flex justify-between text-xs text-slate-500">
+                <div className="flex justify-between text-xs app-text-muted">
                     <span>Brightness</span>
                     <span>{settings.brightness}</span>
                 </div>
@@ -162,13 +162,14 @@ const ImageProcessor: React.FC<ImageProcessorProps> = ({ imageData, onProcessCom
                     type="range" min="-100" max="100" 
                     value={settings.brightness}
                     onChange={(e) => setSettings({...settings, brightness: Number(e.target.value)})}
-                    className="w-full accent-primary-600 h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                    className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                    style={{accentColor: 'var(--accent)'}}
                 />
             </div>
 
             {/* Contrast */}
             <div className="space-y-2">
-                <div className="flex justify-between text-xs text-slate-500">
+                <div className="flex justify-between text-xs app-text-muted">
                     <span>Contrast</span>
                     <span>{settings.contrast}</span>
                 </div>
@@ -176,21 +177,22 @@ const ImageProcessor: React.FC<ImageProcessorProps> = ({ imageData, onProcessCom
                     type="range" min="-100" max="100" 
                     value={settings.contrast}
                     onChange={(e) => setSettings({...settings, contrast: Number(e.target.value)})}
-                    className="w-full accent-primary-600 h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                    className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                    style={{accentColor: 'var(--accent)'}}
                 />
             </div>
 
-            <hr className="border-slate-200 dark:border-slate-700" />
+            <hr className="app-border" />
 
             {/* Advanced CV Filters */}
             <div className="space-y-4">
-                <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">OCR Enhancement</h4>
+                <h4 className="text-sm font-semibold app-text">OCR Enhancement</h4>
                 
                 <div className="flex items-center justify-between">
-                    <label className="text-sm text-slate-600 dark:text-slate-400">Grayscale</label>
+                    <label className="text-sm app-text-muted">Grayscale</label>
                     <button 
                         onClick={() => setSettings(s => ({...s, grayscale: !s.grayscale}))}
-                        className={`w-11 h-6 flex items-center rounded-full transition-colors duration-200 ${settings.grayscale ? 'bg-primary-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+                        className={`w-11 h-6 flex items-center rounded-full transition-colors duration-200 ${settings.grayscale ? 'app-accent' : 'bg-slate-300 dark:bg-slate-600'}`}
                     >
                         <span className={`w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-200 ${settings.grayscale ? 'translate-x-6' : 'translate-x-1'}`} />
                     </button>
@@ -198,7 +200,7 @@ const ImageProcessor: React.FC<ImageProcessorProps> = ({ imageData, onProcessCom
 
                 {/* Thresholding */}
                 <div className="space-y-2">
-                    <div className="flex justify-between text-xs text-slate-500">
+                    <div className="flex justify-between text-xs app-text-muted">
                         <span>Binarization Threshold</span>
                         <span>{settings.threshold === 0 ? 'Off' : settings.threshold}</span>
                     </div>
@@ -206,15 +208,16 @@ const ImageProcessor: React.FC<ImageProcessorProps> = ({ imageData, onProcessCom
                         type="range" min="0" max="255" 
                         value={settings.threshold}
                         onChange={(e) => setSettings({...settings, threshold: Number(e.target.value)})}
-                        className="w-full accent-primary-600 h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                        className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                        style={{accentColor: 'var(--accent)'}}
                     />
-                    <p className="text-xs text-slate-400">High contrast black/white conversion. Ideal for text documents.</p>
+                    <p className="text-xs app-text-muted">High contrast black/white conversion. Ideal for text documents.</p>
                 </div>
             </div>
 
             <button 
                 onClick={() => setSettings(DEFAULT_SETTINGS)}
-                className="w-full py-2 text-xs font-medium text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 border border-slate-200 dark:border-slate-700 rounded hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                className="w-full py-2 text-xs font-medium app-text-muted hover:app-text border app-border rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
             >
                 Reset All Filters
             </button>

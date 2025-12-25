@@ -7,7 +7,8 @@ import ResultsTable from './components/ResultsTable';
 import { 
   Upload, Loader2, Sparkles, FileSpreadsheet, 
   Layout, ChevronRight, FileText, 
-  Trash2, Play, CheckCircle, AlertCircle, FolderInput
+  Trash2, Play, CheckCircle, AlertCircle, FolderInput,
+  ChevronDown
 } from 'lucide-react';
 
 // --- Theme Configurations ---
@@ -32,6 +33,47 @@ const themes: Record<ThemeOption, string> = {
     --text-main: #78350f; --text-muted: #92400e;
     --border: #fcd34d; --accent: #d97706; --accent-hover: #b45309;
   `
+};
+
+const ThemeSelector: React.FC<{ 
+  current: ThemeOption; 
+  onChange: (t: ThemeOption) => void; 
+}> = ({ current, onChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  return (
+    <div className="relative">
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-card)] border app-border rounded-full shadow-sm hover:shadow-md transition-all app-text"
+      >
+        <div className="w-4 h-4 rounded-full bg-gradient-to-br from-[var(--accent)] to-purple-400" />
+        <span className="text-sm font-medium capitalize">{current}</span>
+        <ChevronDown className="w-3 h-3 opacity-50" />
+      </button>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+          <div className="absolute right-0 top-full mt-2 w-32 bg-[var(--bg-card)] border app-border rounded-xl shadow-xl z-50 overflow-hidden py-1 animate-in fade-in zoom-in-95 duration-200">
+            {(['light', 'dark', 'grey', 'warm'] as ThemeOption[]).map(t => (
+              <button
+                key={t}
+                onClick={() => { onChange(t); setIsOpen(false); }}
+                className={`w-full text-left px-4 py-2 text-sm capitalize flex items-center gap-2 transition-colors ${
+                  current === t 
+                  ? 'bg-[var(--accent)] text-white' 
+                  : 'app-text hover:bg-black/5 dark:hover:bg-white/10'
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
 };
 
 const App: React.FC = () => {
@@ -200,7 +242,7 @@ const App: React.FC = () => {
           {/* File Upload (Small - only visible when pages exist to save space) */}
           {state.pages.length > 0 && (
             <div>
-              <label className="flex flex-col items-center justify-center w-full h-20 border-2 border-dashed app-border rounded-lg cursor-pointer hover:bg-black/5 transition-colors">
+              <label className="flex flex-col items-center justify-center w-full h-20 border-2 border-dashed app-border rounded-lg cursor-pointer hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
                 <Upload className="w-5 h-5 app-text-muted mb-1" />
                 <span className="text-[10px] app-text-muted">Add more files</span>
                 <input type="file" className="hidden" multiple accept="image/*,.pdf" onChange={handleFileInput} />
@@ -208,27 +250,7 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {/* Theme Selector */}
-          <div>
-            <h3 className="text-xs font-semibold app-text-muted uppercase mb-3">Theme</h3>
-            <div className="grid grid-cols-2 gap-2">
-              {(['light', 'dark', 'grey', 'warm'] as ThemeOption[]).map(t => (
-                <button
-                  key={t}
-                  onClick={() => setState(s => ({ ...s, theme: t }))}
-                  className={`px-3 py-2 text-xs rounded border ${
-                    state.theme === t 
-                    ? 'border-[var(--accent)] bg-[var(--accent)] text-white' 
-                    : 'app-border app-text hover:bg-black/5'
-                  } capitalize transition-colors`}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Actions */}
+          {/* Actions - Only visible if there are pages */}
           {state.pages.length > 0 && (
             <div>
               <h3 className="text-xs font-semibold app-text-muted uppercase mb-3">Actions</h3>
@@ -242,13 +264,13 @@ const App: React.FC = () => {
               <div className="space-y-2 mt-4">
                  <button 
                   onClick={() => downloadExcelMultiSheet(state.pages)}
-                  className="w-full flex items-center gap-2 px-3 py-2 border app-border rounded-md text-sm app-text hover:bg-black/5"
+                  className="w-full flex items-center gap-2 px-3 py-2 border app-border rounded-md text-sm app-text hover:bg-black/5 dark:hover:bg-white/10"
                 >
                   <FileSpreadsheet className="w-4 h-4 text-green-600" /> Excel (Multi-sheet)
                 </button>
                 <button 
                   onClick={() => downloadExcelMasterSheet(state.pages)}
-                  className="w-full flex items-center gap-2 px-3 py-2 border app-border rounded-md text-sm app-text hover:bg-black/5"
+                  className="w-full flex items-center gap-2 px-3 py-2 border app-border rounded-md text-sm app-text hover:bg-black/5 dark:hover:bg-white/10"
                 >
                   <Layout className="w-4 h-4 text-blue-600" /> Excel (Master Sheet)
                 </button>
@@ -259,7 +281,15 @@ const App: React.FC = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 bg-transparent">
+      <main className="flex-1 flex flex-col min-w-0 bg-transparent relative">
+        {/* Top Right Theme Selector */}
+        <div className="absolute top-4 right-4 z-50">
+          <ThemeSelector 
+            current={state.theme} 
+            onChange={(t) => setState(s => ({ ...s, theme: t }))} 
+          />
+        </div>
+
         {state.pages.length === 0 ? (
           // --- EMPTY STATE / DRAG & DROP ZONE ---
            <div 
@@ -284,7 +314,7 @@ const App: React.FC = () => {
                className={`flex flex-col items-center justify-center w-full max-w-2xl h-64 border-2 border-dashed rounded-3xl cursor-pointer transition-all duration-300 ${
                  isDragging 
                  ? 'border-[var(--accent)] scale-105 bg-[var(--bg-card)] shadow-xl' 
-                 : 'border-[var(--border)] bg-[var(--bg-card)] hover:bg-black/5 hover:border-[var(--accent)]'
+                 : 'border-[var(--border)] bg-[var(--bg-card)] hover:bg-black/5 dark:hover:bg-white/5 hover:border-[var(--accent)]'
                }`}
              >
                 <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 shadow-sm transition-colors ${isDragging ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-main)] app-text-muted'}`}>
@@ -313,8 +343,8 @@ const App: React.FC = () => {
                 <div 
                   key={page.id}
                   onClick={() => setState(s => ({ ...s, selectedPageId: page.id }))}
-                  className={`p-3 border-b app-border cursor-pointer hover:bg-black/5 transition-colors ${
-                    state.selectedPageId === page.id ? 'bg-black/5 border-l-4 border-l-[var(--accent)]' : ''
+                  className={`p-3 border-b app-border cursor-pointer hover:bg-black/5 dark:hover:bg-white/10 transition-colors ${
+                    state.selectedPageId === page.id ? 'bg-black/5 dark:bg-white/10 border-l-4 border-l-[var(--accent)]' : ''
                   }`}
                 >
                   <div className="flex justify-between items-start mb-1">
@@ -333,7 +363,7 @@ const App: React.FC = () => {
               {selectedPage ? (
                 <div className="flex-1 flex flex-col h-full">
                   <header className="h-14 border-b app-border flex items-center justify-between px-4 app-card">
-                     <h2 className="font-semibold app-text truncate">{selectedPage.name}</h2>
+                     <h2 className="font-semibold app-text truncate pr-20">{selectedPage.name}</h2>
                      <button 
                        onClick={() => setState(s => ({ ...s, pages: s.pages.filter(p => p.id !== selectedPage.id), selectedPageId: null }))}
                        className="p-2 text-red-500 hover:bg-red-50 rounded"
