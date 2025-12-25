@@ -193,7 +193,7 @@ const App: React.FC = () => {
       <aside className="w-64 app-sidebar border-r flex flex-col z-20 shadow-xl transition-all duration-300">
         <div className="p-4 border-b app-border flex items-center gap-2">
           <Sparkles className="w-6 h-6 text-[var(--accent)]" />
-          <h1 className="font-bold text-lg app-text">DocDigitizer</h1>
+          <h1 className="font-bold text-lg app-text">Smart Document Digitizer</h1>
         </div>
 
         <div className="p-4 space-y-6 flex-1 overflow-y-auto">
@@ -270,24 +270,30 @@ const App: React.FC = () => {
              onDragLeave={handleDragLeave}
              onDrop={handleDrop}
            >
+             <div className="flex flex-col items-center text-center mb-10 max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-700">
+               <div className="w-20 h-20 bg-[var(--bg-card)] rounded-full shadow-lg border app-border flex items-center justify-center mb-6 ring-4 ring-slate-100 dark:ring-slate-800">
+                 <FileText className="w-10 h-10 text-[var(--accent)]" strokeWidth={1.5} />
+               </div>
+               <h1 className="text-3xl md:text-4xl font-bold app-text mb-4 tracking-tight">Smart Document Digitizer</h1>
+               <p className="text-lg app-text-muted leading-relaxed">
+                 Upload scanned documents or PDFs. We'll automatically digitize tables, handwriting, and text into Excel.
+               </p>
+             </div>
+
              <label 
-               className={`flex flex-col items-center justify-center w-full max-w-2xl h-80 border-4 border-dashed rounded-3xl cursor-pointer transition-all duration-300 ${
+               className={`flex flex-col items-center justify-center w-full max-w-2xl h-64 border-2 border-dashed rounded-3xl cursor-pointer transition-all duration-300 ${
                  isDragging 
-                 ? 'border-[var(--accent)] scale-105 bg-[var(--bg-card)]' 
+                 ? 'border-[var(--accent)] scale-105 bg-[var(--bg-card)] shadow-xl' 
                  : 'border-[var(--border)] bg-[var(--bg-card)] hover:bg-black/5 hover:border-[var(--accent)]'
                }`}
              >
-                <div className={`w-24 h-24 rounded-full flex items-center justify-center mb-6 shadow-sm transition-colors ${isDragging ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-main)] app-text-muted'}`}>
-                  {isDragging ? <FolderInput className="w-10 h-10" /> : <Upload className="w-10 h-10" />}
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 shadow-sm transition-colors ${isDragging ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg-main)] app-text-muted'}`}>
+                  {isDragging ? <FolderInput className="w-8 h-8" /> : <Upload className="w-8 h-8" />}
                 </div>
-                <h2 className="text-2xl font-bold app-text mb-2">
+                <h2 className="text-xl font-bold app-text mb-2">
                   {isDragging ? 'Drop Files Here' : 'Upload PDF or Images'}
                 </h2>
-                <p className="app-text-muted max-w-md text-center mb-6 px-4">
-                  Drag and drop files or a folder containing images. <br/>
-                  We accept JPG, PNG, and PDF files.
-                </p>
-                <div className="px-6 py-2 rounded-full app-accent font-medium shadow-md">
+                <div className="px-6 py-2 rounded-full app-accent font-medium shadow-md text-sm mt-2">
                    Select Files
                 </div>
                 <input 
