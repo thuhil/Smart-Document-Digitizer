@@ -311,7 +311,7 @@ const App: React.FC = () => {
              </div>
 
              <label 
-               className={`flex flex-col items-center justify-center w-full max-w-xl h-48 border-2 border-dashed rounded-3xl cursor-pointer transition-all duration-300 group ${
+               className={`flex flex-col items-center justify-center w-full max-w-5xl h-96 border-2 border-dashed rounded-3xl cursor-pointer transition-all duration-300 group ${
                  isDragging 
                  ? 'border-[var(--accent)] scale-105 bg-[var(--bg-card)] shadow-2xl' 
                  : 'border-[var(--border)] bg-[var(--bg-card)] hover:border-[var(--accent)] hover:shadow-lg'
