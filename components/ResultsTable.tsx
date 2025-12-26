@@ -20,7 +20,8 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ data, onReset }) => {
     );
   }
 
-  const headers = Array.from(new Set(tableData.flatMap(row => Object.keys(row))));
+  // Fix: Explicitly type headers as string[] to prevent 'unknown' inference which causes index errors below
+  const headers: string[] = Array.from(new Set(tableData.flatMap((row: ExtractedDataRow) => Object.keys(row))));
 
   const handleCellChange = (rowIndex: number, key: string, value: string) => {
     const newData = [...tableData];
@@ -72,12 +73,14 @@ const ResultsTable: React.FC<ResultsTableProps> = ({ data, onReset }) => {
                         <td className="p-2 text-center app-text-muted border-r app-border select-none">
                             {rIndex + 1}
                         </td>
-                        {headers.map((header, cIndex) => (
+                        {headers.map((header: string, cIndex) => (
                             <td key={`${rIndex}-${cIndex}`} className="p-0 border-r app-border relative">
                                 <input
                                     type="text"
                                     className="w-full h-full p-3 bg-transparent border-none outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--accent)] transition-all app-text"
+                                    // Fix: Ensuring header is treated as a string to resolve index type error for ExtractedDataRow
                                     value={String(row[header] ?? '')}
+                                    // Fix: Ensuring header is treated as a string to match the signature of handleCellChange
                                     onChange={(e) => handleCellChange(rIndex, header, e.target.value)}
                                 />
                             </td>

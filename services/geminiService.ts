@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { ExtractedDataRow } from "../types";
 
 export const extractDataFromImage = async (base64Image: string): Promise<ExtractedDataRow[]> => {
@@ -7,15 +7,16 @@ export const extractDataFromImage = async (base64Image: string): Promise<Extract
 };
 
 export const extractGenericTable = async (base64Image: string): Promise<ExtractedDataRow[]> => {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) throw new Error("API Key missing");
+    if (!process.env.API_KEY) throw new Error("API Key missing");
   
-    const ai = new GoogleGenAI({ apiKey });
+    // Create a new GoogleGenAI instance right before the call to ensure fresh configuration
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
   
     try {
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+      // Using gemini-3-pro-preview for complex reasoning tasks like structured table and handwriting extraction
+      const response: GenerateContentResponse = await ai.models.generateContent({
+        model: "gemini-3-pro-preview",
         contents: {
           parts: [
             { inlineData: { mimeType: "image/png", data: cleanBase64 } },
@@ -32,6 +33,7 @@ export const extractGenericTable = async (base64Image: string): Promise<Extracte
         }
       });
 
+      // Directly access the .text property from GenerateContentResponse as per SDK guidelines
       if (!response.text) throw new Error("Empty response from Gemini");
       return JSON.parse(response.text);
     } catch (e) {

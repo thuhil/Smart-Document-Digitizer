@@ -2,13 +2,19 @@ import { ExtractedDataRow, Page } from "../types";
 import * as XLSX from "xlsx";
 import * as pdfjsLib from "pdfjs-dist";
 
-// Fix for "Cannot set properties of undefined (setting 'workerSrc')"
-// Handle different module export structures (ESM vs CJS interop) by checking for default
+// PDF.js setup - handle different module export formats (ESM vs CJS interop)
 const pdfjs = (pdfjsLib as any).default || pdfjsLib;
 
-// Initialize PDF.js worker
+// Version must match exactly the version in index.html importmap for compatibility
+const PDFJS_VERSION = '3.11.174';
+
+/**
+ * Configure PDF.js GlobalWorkerOptions.
+ * We use unpkg as it provides a more reliable direct path to the worker file
+ * that avoids common 'esm.sh' bundling issues with importScripts.
+ */
 if (pdfjs.GlobalWorkerOptions) {
-  pdfjs.GlobalWorkerOptions.workerSrc = `https://esm.sh/pdfjs-dist@3.11.174/build/pdf.worker.min.js`;
+  pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.js`;
 }
 
 export const fileToBase64 = (file: File): Promise<string> => {
@@ -21,32 +27,54 @@ export const fileToBase64 = (file: File): Promise<string> => {
 };
 
 export const convertPdfToImages = async (file: File): Promise<string[]> => {
-  const arrayBuffer = await file.arrayBuffer();
-  // Use the properly resolved pdfjs object to call getDocument
-  const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
-  const pdf = await loadingTask.promise;
-  const images: string[] = [];
-
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const viewport = page.getViewport({ scale: 2.0 }); // High quality scale
-    const canvas = document.createElement("canvas");
-    const context = canvas.getContext("2d");
+  try {
+    const arrayBuffer = await file.arrayBuffer();
     
-    if (!context) continue;
+    // Force re-verify worker source before each document processing
+    if (pdfjs.GlobalWorkerOptions) {
+      pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.js`;
+    }
 
-    canvas.height = viewport.height;
-    canvas.width = viewport.width;
+    const loadingTask = pdfjs.getDocument({ 
+      data: arrayBuffer,
+      // Standard character maps for rendering complex fonts
+      cMapUrl: `https://unpkg.com/pdfjs-dist@${PDFJS_VERSION}/cmaps/`,
+      cMapPacked: true,
+      // standardFontDataUrl can also be added if specific errors persist
+    });
+    
+    const pdf = await loadingTask.promise;
+    const images: string[] = [];
 
-    await page.render({
-      canvasContext: context,
-      viewport: viewport,
-    }).promise;
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 2.0 }); // High quality scale
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d");
+      
+      if (!context) continue;
 
-    images.push(canvas.toDataURL("image/jpeg", 0.9));
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+
+      const renderContext = {
+        canvasContext: context,
+        viewport: viewport,
+      };
+
+      await page.render(renderContext).promise;
+      images.push(canvas.toDataURL("image/jpeg", 0.9));
+    }
+    
+    return images;
+  } catch (error) {
+    console.error("PDF conversion error details:", error);
+    // Provide a more descriptive error if it's worker related
+    if (error instanceof Error && (error.message.includes("Worker") || error.message.includes("fake"))) {
+      throw new Error("The PDF processing engine failed to initialize correctly. This is often due to a network restriction or a missing worker script. Please check your internet connection and try again.");
+    }
+    throw error;
   }
-  
-  return images;
 };
 
 // Excel Export Functions
