@@ -280,14 +280,14 @@ const App: React.FC = () => {
                     onClick={processAll}
                     disabled={isGlobalProcessing}
                     className="flex items-center gap-2 px-4 py-1.5 app-accent text-white rounded-full text-sm font-medium shadow-md hover:opacity-90 transition-all hover:scale-105 disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed"
-                    title="Process All Pending Pages"
+                    title="Batch Process Pending Pages"
                   >
                     {isGlobalProcessing ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     ) : (
                       <Play className="w-3.5 h-3.5 fill-current" />
                     )}
-                    <span className="hidden md:inline">{isGlobalProcessing ? 'Processing...' : 'Process Pending'}</span>
+                    <span className="hidden md:inline">{isGlobalProcessing ? 'Processing...' : 'Batch Process'}</span>
                   </button>
 
                   <div className="flex items-center bg-[var(--bg-main)] rounded-full border app-border p-0.5 ml-2">

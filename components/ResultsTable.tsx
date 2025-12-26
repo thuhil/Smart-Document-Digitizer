@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ExtractedDataRow } from '../types';
 import { downloadCSV } from '../utils/fileUtils';
 import { Download, Table as TableIcon, ArrowLeft, RefreshCw } from 'lucide-react';
@@ -10,6 +10,11 @@ interface ResultsTableProps {
 
 const ResultsTable: React.FC<ResultsTableProps> = ({ data, onReset }) => {
   const [tableData, setTableData] = useState<ExtractedDataRow[]>(data);
+
+  // Sync local state with props when the selected page changes
+  useEffect(() => {
+    setTableData(data);
+  }, [data]);
 
   if (tableData.length === 0) {
     return (
