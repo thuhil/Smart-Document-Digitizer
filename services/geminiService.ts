@@ -21,10 +21,15 @@ export const extractGenericTable = async (base64Image: string): Promise<Extracte
           parts: [
             { inlineData: { mimeType: "image/png", data: cleanBase64 } },
             { 
-              text: `Extract the data from this table, including printed headers and handwritten row data. 
-              If the image contains a form, extract key-value pairs.
-              If it contains purely text, structure it into logical paragraphs or lines.
-              Return purely a JSON array of objects. Identify headers automatically.` 
+              text: `Extract the data from this image into a JSON array of objects.
+              
+              STRICT SCHEMA RULES:
+              1. Tables: Use the visual column headers as JSON keys. Convert them to lower_snake_case (e.g., "First Name" -> "first_name").
+              2. Forms/Key-Value Lists: strictly use keys "field" and "value".
+              3. IDs: Do NOT generate artificial columns like "row_id", "id", or "row_number" unless that text explicitly appears in the document header row.
+              4. Consistency: If the extracted data looks like a table, ensure all objects in the array have the same keys.
+              
+              Return ONLY the JSON array.` 
             }
           ]
         },
