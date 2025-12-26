@@ -371,7 +371,7 @@ const App: React.FC = () => {
             {/* Workspace - Right Panel */}
             <div className="flex-1 overflow-hidden flex flex-col bg-[var(--bg-main)]">
               {selectedPage ? (
-                <div className="flex-1 flex flex-col h-full animate-in fade-in duration-300">
+                <div className="flex-1 flex flex-col h-full animate-in fade-in duration-300 overflow-hidden">
                   <header className="h-14 border-b app-border flex items-center justify-between px-6 app-card shrink-0">
                      <div className="flex items-center gap-2 overflow-hidden">
                         <span className="px-2 py-0.5 rounded text-xs font-medium bg-[var(--bg-main)] border app-border app-text-muted">
@@ -388,7 +388,7 @@ const App: React.FC = () => {
                      </button>
                   </header>
                   
-                  <div className="flex-1 overflow-auto p-6">
+                  <div className="flex-1 overflow-hidden p-4 md:p-6 flex flex-col">
                     {selectedPage.status === 'extracting' ? (
                        <div className="h-full flex flex-col items-center justify-center">
                           <div className="relative">
@@ -399,8 +399,8 @@ const App: React.FC = () => {
                           <p className="app-text-muted">Gemini is extracting tables and handwriting...</p>
                        </div>
                     ) : selectedPage.extractedData ? (
-                       <div className="h-full flex flex-col">
-                          <div className="mb-4 flex justify-between items-end">
+                       <div className="h-full flex flex-col overflow-hidden">
+                          <div className="mb-4 flex justify-between items-end shrink-0">
                             <h3 className="text-lg font-semibold app-text">Extraction Results</h3>
                             <button 
                                onClick={() => setState(s => ({ 
@@ -420,14 +420,12 @@ const App: React.FC = () => {
                           </div>
                        </div>
                     ) : (
-                       <div className="h-full flex flex-col items-center">
-                          <div className="w-full max-w-5xl h-[calc(100vh-12rem)]">
-                             <ImageProcessor 
-                               imageData={selectedPage.originalImage} 
-                               onProcessComplete={(img) => handlePageUpdate(selectedPage.id, img)}
-                               onCancel={() => {}}
-                             />
-                          </div>
+                       <div className="flex-1 flex flex-col overflow-hidden">
+                          <ImageProcessor 
+                            imageData={selectedPage.originalImage} 
+                            onProcessComplete={(img) => handlePageUpdate(selectedPage.id, img)}
+                            onCancel={() => {}}
+                          />
                        </div>
                     )}
                   </div>

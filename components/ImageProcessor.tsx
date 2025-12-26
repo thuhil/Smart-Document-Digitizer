@@ -11,6 +11,7 @@ interface ImageProcessorProps {
 
 const ImageProcessor: React.FC<ImageProcessorProps> = ({ imageData, onProcessComplete, onCancel }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [settings, setSettings] = useState<ImageProcessingSettings>(DEFAULT_SETTINGS);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -108,8 +109,9 @@ const ImageProcessor: React.FC<ImageProcessorProps> = ({ imageData, onProcessCom
   };
 
   return (
-    <div className="flex flex-col h-full app-card rounded-xl shadow-lg overflow-hidden border app-border">
-      <div className="p-4 border-b app-border flex justify-between items-center bg-[var(--bg-sidebar)]">
+    <div className="flex flex-col h-full max-h-full app-card rounded-xl shadow-lg overflow-hidden border app-border">
+      {/* Processor Header */}
+      <div className="p-4 border-b app-border flex justify-between items-center bg-[var(--bg-sidebar)] shrink-0">
         <h3 className="text-lg font-semibold flex items-center gap-2 app-text">
           <Sliders className="w-5 h-5 text-[var(--accent)]" />
           Pre-process Image
@@ -128,99 +130,107 @@ const ImageProcessor: React.FC<ImageProcessorProps> = ({ imageData, onProcessCom
         </div>
       </div>
 
+      {/* Main Processor Area */}
       <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
-        {/* Canvas Area */}
-        <div className="flex-1 bg-black/5 dark:bg-black/20 p-4 overflow-auto flex items-center justify-center relative">
-            <canvas ref={canvasRef} className="max-w-full max-h-[60vh] shadow-xl border-2 border-[var(--border)]" />
+        {/* Canvas Display Area */}
+        <div ref={containerRef} className="flex-1 bg-black/5 dark:bg-black/20 p-4 md:p-8 overflow-auto flex items-center justify-center relative min-h-0">
+            <canvas ref={canvasRef} className="max-w-full max-h-full shadow-2xl border-2 border-[var(--border)] object-contain" />
         </div>
 
         {/* Controls Sidebar */}
-        <div className="w-full lg:w-80 app-card border-l app-border p-6 overflow-y-auto space-y-6">
-            
-            <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                    <label className="text-sm font-medium app-text">Rotation</label>
-                    <button 
-                        onClick={() => setSettings(s => ({ ...s, rotation: (s.rotation + 90) % 360 }))}
-                        className="p-1 hover:bg-black/5 dark:hover:bg-white/10 rounded-md transition-colors"
-                        title="Rotate 90 degrees"
-                    >
-                        <RotateCw className="w-4 h-4 app-text-muted" />
-                    </button>
-                </div>
+        <div className="w-full lg:w-80 app-card lg:border-l app-border p-6 overflow-y-auto shrink-0 bg-[var(--bg-card)]">
+            <div className="space-y-6">
+              <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                      <label className="text-sm font-medium app-text">Rotation</label>
+                      <button 
+                          onClick={() => setSettings(s => ({ ...s, rotation: (s.rotation + 90) % 360 }))}
+                          className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-md transition-colors border app-border"
+                          title="Rotate 90 degrees"
+                      >
+                          <RotateCw className="w-4 h-4 app-text-muted" />
+                      </button>
+                  </div>
+              </div>
+
+              <hr className="app-border opacity-50" />
+
+              {/* Brightness */}
+              <div className="space-y-3">
+                  <div className="flex justify-between text-xs font-semibold app-text-muted uppercase tracking-wider">
+                      <span>Brightness</span>
+                      <span className="text-[var(--accent)]">{settings.brightness}</span>
+                  </div>
+                  <input 
+                      type="range" min="-100" max="100" 
+                      value={settings.brightness}
+                      onChange={(e) => setSettings({...settings, brightness: Number(e.target.value)})}
+                      className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                      style={{accentColor: 'var(--accent)'}}
+                  />
+              </div>
+
+              {/* Contrast */}
+              <div className="space-y-3">
+                  <div className="flex justify-between text-xs font-semibold app-text-muted uppercase tracking-wider">
+                      <span>Contrast</span>
+                      <span className="text-[var(--accent)]">{settings.contrast}</span>
+                  </div>
+                  <input 
+                      type="range" min="-100" max="100" 
+                      value={settings.contrast}
+                      onChange={(e) => setSettings({...settings, contrast: Number(e.target.value)})}
+                      className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                      style={{accentColor: 'var(--accent)'}}
+                  />
+              </div>
+
+              <hr className="app-border opacity-50" />
+
+              {/* Advanced CV Filters */}
+              <div className="space-y-5">
+                  <h4 className="text-sm font-bold app-text flex items-center gap-2">
+                    OCR Enhancement
+                  </h4>
+                  
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--bg-main)] border app-border">
+                      <label className="text-sm font-medium app-text">Grayscale</label>
+                      <button 
+                          onClick={() => setSettings(s => ({...s, grayscale: !s.grayscale}))}
+                          className={`w-11 h-6 flex items-center rounded-full transition-colors duration-200 ${settings.grayscale ? 'app-accent' : 'bg-slate-300 dark:bg-slate-600'}`}
+                      >
+                          <span className={`w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-200 ${settings.grayscale ? 'translate-x-6' : 'translate-x-1'}`} />
+                      </button>
+                  </div>
+
+                  {/* Thresholding */}
+                  <div className="space-y-3">
+                      <div className="flex justify-between text-xs font-semibold app-text-muted uppercase tracking-wider">
+                          <span>Binarization</span>
+                          <span className="text-[var(--accent)]">{settings.threshold === 0 ? 'Off' : settings.threshold}</span>
+                      </div>
+                      <input 
+                          type="range" min="0" max="255" 
+                          value={settings.threshold}
+                          onChange={(e) => setSettings({...settings, threshold: Number(e.target.value)})}
+                          className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                          style={{accentColor: 'var(--accent)'}}
+                      />
+                      <p className="text-[11px] leading-tight app-text-muted opacity-80">
+                        High contrast black/white conversion. Ideal for removing shadows from text documents.
+                      </p>
+                  </div>
+              </div>
+
+              <div className="pt-4">
+                <button 
+                    onClick={() => setSettings(DEFAULT_SETTINGS)}
+                    className="w-full py-2.5 text-xs font-bold uppercase tracking-widest app-text-muted hover:app-text border app-border rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition-all active:scale-[0.98]"
+                >
+                    Reset All Filters
+                </button>
+              </div>
             </div>
-
-            <hr className="app-border" />
-
-            {/* Brightness */}
-            <div className="space-y-2">
-                <div className="flex justify-between text-xs app-text-muted">
-                    <span>Brightness</span>
-                    <span>{settings.brightness}</span>
-                </div>
-                <input 
-                    type="range" min="-100" max="100" 
-                    value={settings.brightness}
-                    onChange={(e) => setSettings({...settings, brightness: Number(e.target.value)})}
-                    className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
-                    style={{accentColor: 'var(--accent)'}}
-                />
-            </div>
-
-            {/* Contrast */}
-            <div className="space-y-2">
-                <div className="flex justify-between text-xs app-text-muted">
-                    <span>Contrast</span>
-                    <span>{settings.contrast}</span>
-                </div>
-                <input 
-                    type="range" min="-100" max="100" 
-                    value={settings.contrast}
-                    onChange={(e) => setSettings({...settings, contrast: Number(e.target.value)})}
-                    className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
-                    style={{accentColor: 'var(--accent)'}}
-                />
-            </div>
-
-            <hr className="app-border" />
-
-            {/* Advanced CV Filters */}
-            <div className="space-y-4">
-                <h4 className="text-sm font-semibold app-text">OCR Enhancement</h4>
-                
-                <div className="flex items-center justify-between">
-                    <label className="text-sm app-text-muted">Grayscale</label>
-                    <button 
-                        onClick={() => setSettings(s => ({...s, grayscale: !s.grayscale}))}
-                        className={`w-11 h-6 flex items-center rounded-full transition-colors duration-200 ${settings.grayscale ? 'app-accent' : 'bg-slate-300 dark:bg-slate-600'}`}
-                    >
-                        <span className={`w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-200 ${settings.grayscale ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
-                </div>
-
-                {/* Thresholding */}
-                <div className="space-y-2">
-                    <div className="flex justify-between text-xs app-text-muted">
-                        <span>Binarization Threshold</span>
-                        <span>{settings.threshold === 0 ? 'Off' : settings.threshold}</span>
-                    </div>
-                    <input 
-                        type="range" min="0" max="255" 
-                        value={settings.threshold}
-                        onChange={(e) => setSettings({...settings, threshold: Number(e.target.value)})}
-                        className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
-                        style={{accentColor: 'var(--accent)'}}
-                    />
-                    <p className="text-xs app-text-muted">High contrast black/white conversion. Ideal for text documents.</p>
-                </div>
-            </div>
-
-            <button 
-                onClick={() => setSettings(DEFAULT_SETTINGS)}
-                className="w-full py-2 text-xs font-medium app-text-muted hover:app-text border app-border rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-            >
-                Reset All Filters
-            </button>
         </div>
       </div>
     </div>
