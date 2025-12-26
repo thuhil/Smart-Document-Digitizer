@@ -12,6 +12,7 @@ export interface Page {
   extractedData: ExtractedDataRow[] | null;
   status: ProcessingStatus;
   errorMessage: string | null;
+  consistencyWarning?: string;
 }
 
 export type ThemeOption = 'light' | 'dark' | 'grey' | 'warm';

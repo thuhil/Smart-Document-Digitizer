@@ -8,7 +8,7 @@ import {
   Upload, Loader2, Sparkles, FileSpreadsheet, 
   Layout, ChevronRight, FileText, 
   Trash2, Play, CheckCircle, AlertCircle, FolderInput,
-  ChevronDown, Plus
+  ChevronDown, Plus, AlertTriangle
 } from 'lucide-react';
 
 // --- Theme Configurations ---
@@ -74,6 +74,60 @@ const ThemeSelector: React.FC<{
       )}
     </div>
   );
+};
+
+const checkConsistency = (currentPages: Page[]): Page[] => {
+  const completedPages = currentPages.filter(p => p.status === 'complete' && p.extractedData);
+  if (completedPages.length < 2) return currentPages;
+
+  // 1. Normalize Headers (Description) - Collect superset
+  const allHeaders = new Set<string>();
+  completedPages.forEach(p => {
+    p.extractedData?.forEach(row => {
+      Object.keys(row).forEach(k => allHeaders.add(k));
+    });
+  });
+  const headerArray = Array.from(allHeaders);
+
+  // 2. Determine Mode Row Count
+  const rowCounts = completedPages.map(p => p.extractedData?.length || 0);
+  const countsMap = new Map<number, number>();
+  let maxFreq = 0;
+  let modeCount = rowCounts[0];
+
+  rowCounts.forEach(c => {
+    const freq = (countsMap.get(c) || 0) + 1;
+    countsMap.set(c, freq);
+    if (freq > maxFreq) {
+      maxFreq = freq;
+      modeCount = c;
+    }
+  });
+
+  return currentPages.map(p => {
+    if (p.status !== 'complete' || !p.extractedData) return p;
+
+    // Normalize Data Headers: Ensure every row has all headers
+    const normalizedData = p.extractedData.map(row => {
+      const newRow: any = { ...row };
+      headerArray.forEach(h => {
+        if (!(h in newRow)) newRow[h] = ""; // Fill missing with empty string
+      });
+      return newRow;
+    });
+
+    // Check Row Count
+    let warning = undefined;
+    if (normalizedData.length !== modeCount) {
+      warning = `Row count mismatch: Found ${normalizedData.length}, expected ${modeCount} based on similar pages.`;
+    }
+
+    return {
+      ...p,
+      extractedData: normalizedData,
+      consistencyWarning: warning
+    };
+  });
 };
 
 const App: React.FC = () => {
@@ -194,7 +248,7 @@ const App: React.FC = () => {
 
     setState(prev => ({
       ...prev,
-      pages: prev.pages.map(p => p.id === page.id ? { ...p, status: 'extracting' } : p)
+      pages: prev.pages.map(p => p.id === page.id ? { ...p, status: 'extracting', consistencyWarning: undefined } : p)
     }));
 
     try {
@@ -222,21 +276,20 @@ const App: React.FC = () => {
     // Parallel processing for all pending pages
     await Promise.all(idlePages.map(page => processPage(page)));
     
-    setState(prev => ({ ...prev, globalStatus: 'idle' }));
+    // Run consistency check and normalization after batch completes
+    setState(prev => ({ 
+      ...prev, 
+      pages: checkConsistency(prev.pages),
+      globalStatus: 'idle' 
+    }));
   }, [state.pages, processPage]);
 
   const handlePageUpdate = (pageId: string, newImage: string) => {
     setState(prev => {
       const updatedPages = prev.pages.map(p => p.id === pageId ? { ...p, processedImage: newImage } : p);
-      const updatedPage = updatedPages.find(p => p.id === pageId);
-      
-      // We return the new state first
       return { ...prev, pages: updatedPages };
     });
     
-    // Re-fetch the updated page object from the latest state for processing
-    // Note: In a real app, you might want to wait for the next render or use a ref, 
-    // but here we can just find it in the current pages array for immediate trigger.
     const page = state.pages.find(p => p.id === pageId);
     if (page) {
       processPage({ ...page, processedImage: newImage });
@@ -246,7 +299,7 @@ const App: React.FC = () => {
   const handleResetPage = (pageId: string) => {
     setState(prev => ({
       ...prev,
-      pages: prev.pages.map(p => p.id === pageId ? { ...p, extractedData: null, status: 'idle' } : p)
+      pages: prev.pages.map(p => p.id === pageId ? { ...p, extractedData: null, status: 'idle', consistencyWarning: undefined } : p)
     }));
   };
 
@@ -383,12 +436,17 @@ const App: React.FC = () => {
                 >
                   <div className="flex justify-between items-start mb-2">
                     <span className="text-sm font-medium app-text truncate w-32" title={page.name}>{page.name}</span>
-                    <StatusIcon status={page.status} />
+                    <StatusIcon status={page.status} warning={page.consistencyWarning} />
                   </div>
                   <div className="aspect-[3/4] bg-[var(--bg-main)] rounded-md overflow-hidden relative border app-border shadow-sm group-hover:shadow-md transition-all">
                      <img src={page.processedImage || page.originalImage} className="w-full h-full object-cover" />
                      {/* Overlay for actions if needed */}
                   </div>
+                  {page.consistencyWarning && (
+                    <div className="mt-2 text-[10px] leading-tight text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-1.5 rounded border border-amber-200 dark:border-amber-800">
+                      {page.consistencyWarning}
+                    </div>
+                  )}
                 </div>
               ))}
               <div className="p-4 flex justify-center">
@@ -433,9 +491,15 @@ const App: React.FC = () => {
                        <div className="h-full flex flex-col overflow-hidden">
                           <div className="mb-4 flex justify-between items-end shrink-0">
                             <h3 className="text-lg font-semibold app-text">Extraction Results</h3>
+                            {selectedPage.consistencyWarning && (
+                              <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-3 py-1 rounded-full border border-amber-200 dark:border-amber-800">
+                                <AlertTriangle className="w-4 h-4" />
+                                {selectedPage.consistencyWarning}
+                              </div>
+                            )}
                             <button 
                                onClick={() => handleResetPage(selectedPage.id)}
-                               className="text-xs font-medium app-text-muted hover:text-[var(--accent)] flex items-center gap-1 transition-colors"
+                               className="text-xs font-medium app-text-muted hover:text-[var(--accent)] flex items-center gap-1 transition-colors ml-auto"
                             >
                               <ChevronRight className="w-3 h-3 rotate-180" /> Re-process Image
                             </button>
@@ -472,7 +536,8 @@ const App: React.FC = () => {
   );
 };
 
-const StatusIcon = ({ status }: { status: string }) => {
+const StatusIcon = ({ status, warning }: { status: string, warning?: string }) => {
+  if (warning) return <AlertTriangle className="w-4 h-4 text-amber-500" />;
   switch (status) {
     case 'complete': return <CheckCircle className="w-4 h-4 text-green-500" />;
     case 'error': return <AlertCircle className="w-4 h-4 text-red-500" />;
