@@ -187,47 +187,72 @@ const App: React.FC = () => {
     }
   };
 
-  const processPage = async (pageId: string) => {
-    const page = state.pages.find(p => p.id === pageId);
-    if (!page || !page.processedImage) return;
+  // Fixed: Re-written to avoid relying on stale closure state
+  const processPage = useCallback(async (page: Page) => {
+    const imageToProcess = page.processedImage || page.originalImage;
+    if (!imageToProcess) return;
 
     setState(prev => ({
       ...prev,
-      pages: prev.pages.map(p => p.id === pageId ? { ...p, status: 'extracting' } : p)
+      pages: prev.pages.map(p => p.id === page.id ? { ...p, status: 'extracting' } : p)
     }));
 
     try {
-      const data = await extractGenericTable(page.processedImage);
+      const data = await extractGenericTable(imageToProcess);
       setState(prev => ({
         ...prev,
-        pages: prev.pages.map(p => p.id === pageId ? { ...p, extractedData: data, status: 'complete' } : p)
+        pages: prev.pages.map(p => p.id === page.id ? { ...p, extractedData: data, status: 'complete' } : p)
       }));
     } catch (err: any) {
+      console.error(`Error processing page ${page.id}:`, err);
       setState(prev => ({
         ...prev,
-        pages: prev.pages.map(p => p.id === pageId ? { ...p, status: 'error', errorMessage: err.message } : p)
+        pages: prev.pages.map(p => p.id === page.id ? { ...p, status: 'error', errorMessage: err.message } : p)
       }));
     }
-  };
+  }, []);
 
-  const processAll = async () => {
+  const processAll = useCallback(async () => {
+    // Note: We use the snapshot of state.pages from when processAll is triggered
     const idlePages = state.pages.filter(p => p.status === 'idle' || p.status === 'error');
-    for (const page of idlePages) {
-      await processPage(page.id);
+    if (idlePages.length === 0) return;
+
+    setState(prev => ({ ...prev, globalStatus: 'extracting' }));
+    
+    // Parallel processing for all pending pages
+    await Promise.all(idlePages.map(page => processPage(page)));
+    
+    setState(prev => ({ ...prev, globalStatus: 'idle' }));
+  }, [state.pages, processPage]);
+
+  const handlePageUpdate = (pageId: string, newImage: string) => {
+    setState(prev => {
+      const updatedPages = prev.pages.map(p => p.id === pageId ? { ...p, processedImage: newImage } : p);
+      const updatedPage = updatedPages.find(p => p.id === pageId);
+      
+      // We return the new state first
+      return { ...prev, pages: updatedPages };
+    });
+    
+    // Re-fetch the updated page object from the latest state for processing
+    // Note: In a real app, you might want to wait for the next render or use a ref, 
+    // but here we can just find it in the current pages array for immediate trigger.
+    const page = state.pages.find(p => p.id === pageId);
+    if (page) {
+      processPage({ ...page, processedImage: newImage });
     }
   };
 
-  const handlePageUpdate = (pageId: string, newImage: string) => {
+  const handleResetPage = (pageId: string) => {
     setState(prev => ({
       ...prev,
-      pages: prev.pages.map(p => p.id === pageId ? { ...p, processedImage: newImage } : p)
+      pages: prev.pages.map(p => p.id === pageId ? { ...p, extractedData: null, status: 'idle' } : p)
     }));
-    // Auto trigger extraction after processing
-    processPage(pageId);
   };
 
   // UI Components
   const selectedPage = state.pages.find(p => p.id === state.selectedPageId);
+  const isGlobalProcessing = state.globalStatus === 'extracting' || state.pages.some(p => p.status === 'extracting');
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-[var(--bg-main)]">
@@ -253,10 +278,16 @@ const App: React.FC = () => {
                   
                   <button 
                     onClick={processAll}
-                    className="flex items-center gap-2 px-4 py-1.5 app-accent text-white rounded-full text-sm font-medium shadow-md hover:opacity-90 transition-all hover:scale-105"
+                    disabled={isGlobalProcessing}
+                    className="flex items-center gap-2 px-4 py-1.5 app-accent text-white rounded-full text-sm font-medium shadow-md hover:opacity-90 transition-all hover:scale-105 disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed"
                     title="Process All Pending Pages"
                   >
-                    <Play className="w-3.5 h-3.5 fill-current" /> <span className="hidden md:inline">Process Pending</span>
+                    {isGlobalProcessing ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Play className="w-3.5 h-3.5 fill-current" />
+                    )}
+                    <span className="hidden md:inline">{isGlobalProcessing ? 'Processing...' : 'Process Pending'}</span>
                   </button>
 
                   <div className="flex items-center bg-[var(--bg-main)] rounded-full border app-border p-0.5 ml-2">
@@ -403,10 +434,7 @@ const App: React.FC = () => {
                           <div className="mb-4 flex justify-between items-end shrink-0">
                             <h3 className="text-lg font-semibold app-text">Extraction Results</h3>
                             <button 
-                               onClick={() => setState(s => ({ 
-                                 ...s, 
-                                 pages: s.pages.map(p => p.id === selectedPage.id ? { ...p, extractedData: null } : p) 
-                               }))}
+                               onClick={() => handleResetPage(selectedPage.id)}
                                className="text-xs font-medium app-text-muted hover:text-[var(--accent)] flex items-center gap-1 transition-colors"
                             >
                               <ChevronRight className="w-3 h-3 rotate-180" /> Re-process Image
@@ -415,7 +443,7 @@ const App: React.FC = () => {
                           <div className="flex-1 app-card rounded-xl border app-border overflow-hidden shadow-lg">
                             <ResultsTable 
                                data={selectedPage.extractedData} 
-                               onReset={() => {}} 
+                               onReset={() => handleResetPage(selectedPage.id)} 
                             />
                           </div>
                        </div>
