@@ -273,8 +273,16 @@ const App: React.FC = () => {
 
     setState(prev => ({ ...prev, globalStatus: 'extracting' }));
     
-    // Parallel processing for all pending pages
-    await Promise.all(idlePages.map(page => processPage(page)));
+    // Serial processing to prevent Rate Limiting (429)
+    for (const page of idlePages) {
+        // We assume the page object in idlePages has the necessary data (originalImage/processedImage)
+        // processing sequentially allows the API to recover its token bucket
+        await processPage(page);
+        
+        // Add a deliberate delay between requests
+        // This is a simple but effective client-side rate limiter
+        await new Promise(resolve => setTimeout(resolve, 1500));
+    }
     
     // Run consistency check and normalization after batch completes
     setState(prev => ({ 
