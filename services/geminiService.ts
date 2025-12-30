@@ -18,22 +18,25 @@ export const extractGenericTable = async (base64Image: string): Promise<Extracte
             // Using gemini-3-pro-preview for complex reasoning tasks like structured table and handwriting extraction
             return await ai.models.generateContent({
                 model: "gemini-3-pro-preview",
-                contents: {
-                  parts: [
-                    { inlineData: { mimeType: "image/png", data: cleanBase64 } },
-                    { 
-                      text: `Extract the data from this image into a JSON array of objects.
-                      
-                      STRICT SCHEMA RULES:
-                      1. Tables: Use the visual column headers as JSON keys. Convert them to lower_snake_case (e.g., "First Name" -> "first_name").
-                      2. Forms/Key-Value Lists: strictly use keys "field" and "value".
-                      3. IDs: Do NOT generate artificial columns like "row_id", "id", or "row_number" unless that text explicitly appears in the document header row.
-                      4. Consistency: If the extracted data looks like a table, ensure all objects in the array have the same keys.
-                      
-                      Return ONLY the JSON array.` 
-                    }
-                  ]
-                },
+                contents: [
+                  {
+                    role: "user",
+                    parts: [
+                      { inlineData: { mimeType: "image/png", data: cleanBase64 } },
+                      { 
+                        text: `Extract the data from this image into a JSON array of objects.
+                        
+                        STRICT SCHEMA RULES:
+                        1. Tables: Use the visual column headers as JSON keys. Convert them to lower_snake_case (e.g., "First Name" -> "first_name").
+                        2. Forms/Key-Value Lists: strictly use keys "field" and "value".
+                        3. IDs: Do NOT generate artificial columns like "row_id", "id", or "row_number" unless that text explicitly appears in the document header row.
+                        4. Consistency: If the extracted data looks like a table, ensure all objects in the array have the same keys.
+                        
+                        Return ONLY the JSON array.` 
+                      }
+                    ]
+                  }
+                ],
                 config: {
                   responseMimeType: "application/json"
                 }
@@ -61,7 +64,10 @@ export const extractGenericTable = async (base64Image: string): Promise<Extracte
 
       // Directly access the .text property from GenerateContentResponse as per SDK guidelines
       if (!response.text) throw new Error("Empty response from Gemini");
-      return JSON.parse(response.text);
+
+      // Robust JSON parsing: Remove Markdown code blocks if present
+      const cleanedText = response.text.replace(/```json|```/g, '').trim();
+      return JSON.parse(cleanedText);
     } catch (e) {
       console.error("Extraction error", e);
       throw e;

@@ -7,9 +7,10 @@ interface ImageProcessorProps {
   imageData: string;
   onProcessComplete: (processedImage: string) => void;
   onCancel: () => void;
+  disabled?: boolean;
 }
 
-const ImageProcessor: React.FC<ImageProcessorProps> = ({ imageData, onProcessComplete, onCancel }) => {
+const ImageProcessor: React.FC<ImageProcessorProps> = ({ imageData, onProcessComplete, onCancel, disabled = false }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [settings, setSettings] = useState<ImageProcessingSettings>(DEFAULT_SETTINGS);
@@ -98,6 +99,7 @@ const ImageProcessor: React.FC<ImageProcessorProps> = ({ imageData, onProcessCom
   }, [applyFilters]);
 
   const handleSave = () => {
+    if (disabled) return;
     if (canvasRef.current) {
       setIsProcessing(true);
       // Small delay to allow UI to update
@@ -109,7 +111,7 @@ const ImageProcessor: React.FC<ImageProcessorProps> = ({ imageData, onProcessCom
   };
 
   return (
-    <div className="flex flex-col h-full max-h-full app-card rounded-xl shadow-lg overflow-hidden border app-border">
+    <div className={`flex flex-col h-full max-h-full app-card rounded-xl shadow-lg overflow-hidden border app-border ${disabled ? 'opacity-70 pointer-events-none' : ''}`}>
       {/* Processor Header */}
       <div className="p-4 border-b app-border flex justify-between items-center bg-[var(--bg-sidebar)] shrink-0">
         <h3 className="text-lg font-semibold flex items-center gap-2 app-text">
@@ -117,12 +119,12 @@ const ImageProcessor: React.FC<ImageProcessorProps> = ({ imageData, onProcessCom
           Pre-process Image
         </h3>
         <div className="flex gap-2">
-            <button onClick={onCancel} className="px-3 py-1 text-sm font-medium app-text-muted hover:app-text transition-colors">
+            <button onClick={onCancel} className="px-3 py-1 text-sm font-medium app-text-muted hover:app-text transition-colors" disabled={disabled}>
                 Cancel
             </button>
             <button 
                 onClick={handleSave} 
-                disabled={isProcessing}
+                disabled={isProcessing || disabled}
                 className="flex items-center gap-2 px-4 py-1.5 app-accent text-white text-sm font-medium rounded-md transition-colors shadow-sm disabled:opacity-50"
             >
                 {isProcessing ? 'Processing...' : <><Check className="w-4 h-4" /> Next: Extract Data</>}
@@ -147,6 +149,7 @@ const ImageProcessor: React.FC<ImageProcessorProps> = ({ imageData, onProcessCom
                           onClick={() => setSettings(s => ({ ...s, rotation: (s.rotation + 90) % 360 }))}
                           className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-md transition-colors border app-border"
                           title="Rotate 90 degrees"
+                          disabled={disabled}
                       >
                           <RotateCw className="w-4 h-4 app-text-muted" />
                       </button>
@@ -167,6 +170,7 @@ const ImageProcessor: React.FC<ImageProcessorProps> = ({ imageData, onProcessCom
                       onChange={(e) => setSettings({...settings, brightness: Number(e.target.value)})}
                       className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
                       style={{accentColor: 'var(--accent)'}}
+                      disabled={disabled}
                   />
               </div>
 
@@ -182,6 +186,7 @@ const ImageProcessor: React.FC<ImageProcessorProps> = ({ imageData, onProcessCom
                       onChange={(e) => setSettings({...settings, contrast: Number(e.target.value)})}
                       className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
                       style={{accentColor: 'var(--accent)'}}
+                      disabled={disabled}
                   />
               </div>
 
@@ -198,6 +203,7 @@ const ImageProcessor: React.FC<ImageProcessorProps> = ({ imageData, onProcessCom
                       <button 
                           onClick={() => setSettings(s => ({...s, grayscale: !s.grayscale}))}
                           className={`w-11 h-6 flex items-center rounded-full transition-colors duration-200 ${settings.grayscale ? 'app-accent' : 'bg-slate-300 dark:bg-slate-600'}`}
+                          disabled={disabled}
                       >
                           <span className={`w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-200 ${settings.grayscale ? 'translate-x-6' : 'translate-x-1'}`} />
                       </button>
@@ -215,6 +221,7 @@ const ImageProcessor: React.FC<ImageProcessorProps> = ({ imageData, onProcessCom
                           onChange={(e) => setSettings({...settings, threshold: Number(e.target.value)})}
                           className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
                           style={{accentColor: 'var(--accent)'}}
+                          disabled={disabled}
                       />
                       <p className="text-[11px] leading-tight app-text-muted opacity-80">
                         High contrast black/white conversion. Ideal for removing shadows from text documents.
@@ -225,7 +232,8 @@ const ImageProcessor: React.FC<ImageProcessorProps> = ({ imageData, onProcessCom
               <div className="pt-4">
                 <button 
                     onClick={() => setSettings(DEFAULT_SETTINGS)}
-                    className="w-full py-2.5 text-xs font-bold uppercase tracking-widest app-text-muted hover:app-text border app-border rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition-all active:scale-[0.98]"
+                    className="w-full py-2.5 text-xs font-bold uppercase tracking-widest app-text-muted hover:app-text border app-border rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition-all active:scale-[0.98] disabled:opacity-50"
+                    disabled={disabled}
                 >
                     Reset All Filters
                 </button>

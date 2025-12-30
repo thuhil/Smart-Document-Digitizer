@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AppState, Page, ThemeOption } from './types';
 import { extractGenericTable } from './services/geminiService';
 import { fileToBase64, convertPdfToImages, downloadExcelMultiSheet, downloadExcelMasterSheet } from './utils/fileUtils';
@@ -138,6 +138,12 @@ const App: React.FC = () => {
     theme: 'light'
   });
 
+  // Use Ref to keep track of latest pages state for async operations
+  const pagesRef = useRef(state.pages);
+  useEffect(() => {
+    pagesRef.current = state.pages;
+  }, [state.pages]);
+
   const [isDragging, setIsDragging] = useState(false);
 
   // Inject Theme CSS
@@ -241,7 +247,9 @@ const App: React.FC = () => {
     }
   };
 
-  // Fixed: Re-written to avoid relying on stale closure state
+  // Process a single page. 
+  // IMPORTANT: This function expects to receive the specific page object it needs to process.
+  // In the loop below, we fetch the LATEST version of the page object from the ref to ensure we aren't using stale data.
   const processPage = useCallback(async (page: Page) => {
     const imageToProcess = page.processedImage || page.originalImage;
     if (!imageToProcess) return;
@@ -267,17 +275,24 @@ const App: React.FC = () => {
   }, []);
 
   const processAll = useCallback(async () => {
-    // Note: We use the snapshot of state.pages from when processAll is triggered
-    const idlePages = state.pages.filter(p => p.status === 'idle' || p.status === 'error');
-    if (idlePages.length === 0) return;
+    // 1. Identify IDs to process based on CURRENT state (via ref)
+    const pagesToProcessIds = pagesRef.current
+        .filter(p => p.status === 'idle' || p.status === 'error')
+        .map(p => p.id);
+        
+    if (pagesToProcessIds.length === 0) return;
 
     setState(prev => ({ ...prev, globalStatus: 'extracting' }));
     
     // Serial processing to prevent Rate Limiting (429)
-    for (const page of idlePages) {
-        // We assume the page object in idlePages has the necessary data (originalImage/processedImage)
-        // processing sequentially allows the API to recover its token bucket
-        await processPage(page);
+    for (const pageId of pagesToProcessIds) {
+        // 2. Fetch LATEST version of this page from Ref before processing
+        // This handles the case where user rotated/cropped image while previous page was processing
+        const freshPage = pagesRef.current.find(p => p.id === pageId);
+        
+        if (freshPage) {
+            await processPage(freshPage);
+        }
         
         // Add a deliberate delay between requests
         // This is a simple but effective client-side rate limiter
@@ -290,18 +305,14 @@ const App: React.FC = () => {
       pages: checkConsistency(prev.pages),
       globalStatus: 'idle' 
     }));
-  }, [state.pages, processPage]);
+  }, [processPage]);
 
   const handlePageUpdate = (pageId: string, newImage: string) => {
     setState(prev => {
       const updatedPages = prev.pages.map(p => p.id === pageId ? { ...p, processedImage: newImage } : p);
       return { ...prev, pages: updatedPages };
     });
-    
-    const page = state.pages.find(p => p.id === pageId);
-    if (page) {
-      processPage({ ...page, processedImage: newImage });
-    }
+    // Note: We don't auto-process here anymore to give user control, they hit "Extract Data" in the processor
   };
 
   const handleResetPage = (pageId: string) => {
@@ -313,7 +324,9 @@ const App: React.FC = () => {
 
   // UI Components
   const selectedPage = state.pages.find(p => p.id === state.selectedPageId);
-  const isGlobalProcessing = state.globalStatus === 'extracting' || state.pages.some(p => p.status === 'extracting');
+  const isGlobalProcessing = state.globalStatus === 'extracting';
+  // Check if *any* page is extracting (for individual loaders)
+  const isAnyPageExtracting = state.pages.some(p => p.status === 'extracting');
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-[var(--bg-main)]">
@@ -332,14 +345,14 @@ const App: React.FC = () => {
                 
                 {/* Actions Group */}
                 <div className="flex items-center gap-2">
-                  <label className="flex items-center justify-center w-9 h-9 rounded-full bg-[var(--bg-main)] hover:bg-black/5 dark:hover:bg-white/10 cursor-pointer text-[var(--accent)] border app-border transition-all" title="Add more files">
+                  <label className={`flex items-center justify-center w-9 h-9 rounded-full bg-[var(--bg-main)] cursor-pointer text-[var(--accent)] border app-border transition-all ${isGlobalProcessing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-black/5 dark:hover:bg-white/10'}`} title="Add more files">
                     <Plus className="w-5 h-5" />
-                    <input type="file" className="hidden" multiple accept="image/*,.pdf" onChange={handleFileInput} />
+                    <input type="file" className="hidden" multiple accept="image/*,.pdf" onChange={handleFileInput} disabled={isGlobalProcessing} />
                   </label>
                   
                   <button 
                     onClick={processAll}
-                    disabled={isGlobalProcessing}
+                    disabled={isGlobalProcessing || isAnyPageExtracting}
                     className="flex items-center gap-2 px-4 py-1.5 app-accent text-white rounded-full text-sm font-medium shadow-md hover:opacity-90 transition-all hover:scale-105 disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed"
                     title="Batch Process Pending Pages"
                   >
@@ -354,16 +367,18 @@ const App: React.FC = () => {
                   <div className="flex items-center bg-[var(--bg-main)] rounded-full border app-border p-0.5 ml-2">
                      <button 
                       onClick={() => downloadExcelMultiSheet(state.pages)}
-                      className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-full text-green-600 transition-colors"
+                      className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-full text-green-600 transition-colors disabled:opacity-50"
                       title="Export Excel (Multi-sheet)"
+                      disabled={isGlobalProcessing}
                      >
                        <FileSpreadsheet className="w-4 h-4" />
                      </button>
                      <div className="w-px h-4 bg-[var(--border)] mx-0.5"></div>
                      <button 
                       onClick={() => downloadExcelMasterSheet(state.pages)}
-                      className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-full text-blue-600 transition-colors"
+                      className="p-1.5 hover:bg-black/5 dark:hover:bg-white/10 rounded-full text-blue-600 transition-colors disabled:opacity-50"
                       title="Export Excel (Master Sheet)"
+                      disabled={isGlobalProcessing}
                      >
                        <Layout className="w-4 h-4" />
                      </button>
@@ -424,6 +439,7 @@ const App: React.FC = () => {
                   multiple 
                   accept="image/*,.pdf" 
                   onChange={handleFileInput} 
+                  disabled={isGlobalProcessing}
                 />
              </label>
            </div>
@@ -458,9 +474,9 @@ const App: React.FC = () => {
                 </div>
               ))}
               <div className="p-4 flex justify-center">
-                 <label className="flex items-center gap-2 text-xs font-medium app-text-muted hover:text-[var(--accent)] cursor-pointer transition-colors">
+                 <label className={`flex items-center gap-2 text-xs font-medium app-text-muted hover:text-[var(--accent)] cursor-pointer transition-colors ${isGlobalProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}>
                     <Plus className="w-4 h-4" /> Add more pages
-                    <input type="file" className="hidden" multiple accept="image/*,.pdf" onChange={handleFileInput} />
+                    <input type="file" className="hidden" multiple accept="image/*,.pdf" onChange={handleFileInput} disabled={isGlobalProcessing} />
                  </label>
               </div>
             </div>
@@ -478,8 +494,9 @@ const App: React.FC = () => {
                      </div>
                      <button 
                        onClick={() => setState(s => ({ ...s, pages: s.pages.filter(p => p.id !== selectedPage.id), selectedPageId: null }))}
-                       className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors"
+                       className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                        title="Delete Page"
+                       disabled={isGlobalProcessing || selectedPage.status === 'extracting'}
                      >
                        <Trash2 className="w-4 h-4" />
                      </button>
@@ -507,7 +524,8 @@ const App: React.FC = () => {
                             )}
                             <button 
                                onClick={() => handleResetPage(selectedPage.id)}
-                               className="text-xs font-medium app-text-muted hover:text-[var(--accent)] flex items-center gap-1 transition-colors ml-auto"
+                               className="text-xs font-medium app-text-muted hover:text-[var(--accent)] flex items-center gap-1 transition-colors ml-auto disabled:opacity-50"
+                               disabled={isGlobalProcessing}
                             >
                               <ChevronRight className="w-3 h-3 rotate-180" /> Re-process Image
                             </button>
@@ -523,8 +541,14 @@ const App: React.FC = () => {
                        <div className="flex-1 flex flex-col overflow-hidden">
                           <ImageProcessor 
                             imageData={selectedPage.originalImage} 
-                            onProcessComplete={(img) => handlePageUpdate(selectedPage.id, img)}
+                            onProcessComplete={(img) => {
+                                handlePageUpdate(selectedPage.id, img);
+                                // Trigger processing immediately after "Next" is clicked in processor, reusing processPage logic
+                                const updatedPage = { ...selectedPage, processedImage: img };
+                                processPage(updatedPage);
+                            }}
                             onCancel={() => {}}
+                            disabled={isGlobalProcessing}
                           />
                        </div>
                     )}
